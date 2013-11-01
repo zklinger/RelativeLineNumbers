@@ -65,38 +65,38 @@ namespace RelativeLineNumbers
 			_fontFamily = _textView.FormattedLineSource.DefaultTextProperties.Typeface.FontFamily;
 			_fontEmSize = _textView.FormattedLineSource.DefaultTextProperties.FontRenderingEmSize;
 
-            SetMarginWidth();
+			SetMarginWidth();
 
 			_textView.Caret.PositionChanged += new EventHandler<CaretPositionChangedEventArgs>(OnCaretPositionChanged);
 			_textView.ViewportHeightChanged += (sender, args) => DrawLineNumbers();
 			_textView.LayoutChanged += new EventHandler<TextViewLayoutChangedEventArgs>(OnLayoutChanged);
-            _textView.ZoomLevelChanged += (sender, args) => SetMarginWidth();
+			_textView.ZoomLevelChanged += (sender, args) => SetMarginWidth();
 			_formatMap.FormatMappingChanged += (sender, args) => DrawLineNumbers();
 
 			this.ToolTip = "To customize Relative Line Numbers select:\n" +
-			               "  Tools -> Options -> Fonts and Colors -> Relative Line Numbers";
+								"  Tools -> Options -> Fonts and Colors -> Relative Line Numbers";
 		}
 
-        private double FontSize
-        {
-            get { return _fontEmSize * ZoomFactor; }
-        }
+		private double FontSize
+		{
+			get { return _fontEmSize * ZoomFactor; }
+		}
 
-        private void SetMarginWidth()
-        {
-            this.Width = GetMarginWidth(new Typeface(_fontFamily.Source), FontSize) + 2 * _labelOffsetX;
-        }
+		private void SetMarginWidth()
+		{
+			this.Width = GetMarginWidth(new Typeface(_fontFamily.Source), FontSize) + 2 * _labelOffsetX;
+		}
 
-        private double ZoomFactor
-        {
-            get { return _textView.ZoomLevel / 100d; }
-        }
+		private double ZoomFactor
+		{
+			get { return _textView.ZoomLevel / 100d; }
+		}
 
 		#endregion
 
 		#region Event Handlers
 
-		private void OnCaretPositionChanged (object sender, CaretPositionChangedEventArgs e)
+		private void OnCaretPositionChanged(object sender, CaretPositionChangedEventArgs e)
 		{
 			double pos = e.TextView.Caret.ContainingTextViewLine.TextTop;
 
@@ -133,7 +133,7 @@ namespace RelativeLineNumbers
 			ResourceDictionary rd = _formatMap.GetProperties("Relative Line Numbers");
 			SolidColorBrush fgBrush = (SolidColorBrush)rd[EditorFormatDefinition.ForegroundBrushId];
 			FontWeight fontWeight = Convert.ToBoolean(rd[ClassificationFormatDefinition.IsBoldId]) ?
-				                         FontWeights.Bold : FontWeights.Normal;
+												 FontWeights.Bold : FontWeights.Normal;
 			this.Background = (SolidColorBrush)rd[EditorFormatDefinition.BackgroundBrushId];
 
 			for (int i = 0; i < _textView.TextViewLines.Count; i++)
@@ -141,7 +141,7 @@ namespace RelativeLineNumbers
 				TextBlock tb = new TextBlock();
 				tb.Text = string.Format("{0,2}", Math.Abs(cursorLineIndex - i));
 				tb.FontFamily = _fontFamily;
-                tb.FontSize = FontSize; 
+				tb.FontSize = FontSize;
 				tb.Foreground = fgBrush;
 				tb.FontWeight = fontWeight;
 				Canvas.SetLeft(tb, _labelOffsetX);
