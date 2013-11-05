@@ -65,32 +65,15 @@ namespace RelativeLineNumbers
 			_fontFamily = _textView.FormattedLineSource.DefaultTextProperties.Typeface.FontFamily;
 			_fontEmSize = _textView.FormattedLineSource.DefaultTextProperties.FontRenderingEmSize;
 
-            SetMarginWidth();
-
+			this.Width = GetMarginWidth(new Typeface(_fontFamily.Source), _fontEmSize) + 2 * _labelOffsetX;
 			_textView.Caret.PositionChanged += new EventHandler<CaretPositionChangedEventArgs>(OnCaretPositionChanged);
 			_textView.ViewportHeightChanged += (sender, args) => DrawLineNumbers();
 			_textView.LayoutChanged += new EventHandler<TextViewLayoutChangedEventArgs>(OnLayoutChanged);
-            _textView.ZoomLevelChanged += (sender, args) => SetMarginWidth();
 			_formatMap.FormatMappingChanged += (sender, args) => DrawLineNumbers();
 
 			this.ToolTip = "To customize Relative Line Numbers select:\n" +
 			               "  Tools -> Options -> Fonts and Colors -> Relative Line Numbers";
 		}
-
-        private double FontSize
-        {
-            get { return _fontEmSize * ZoomFactor; }
-        }
-
-        private void SetMarginWidth()
-        {
-            this.Width = GetMarginWidth(new Typeface(_fontFamily.Source), FontSize) + 2 * _labelOffsetX;
-        }
-
-        private double ZoomFactor
-        {
-            get { return _textView.ZoomLevel / 100d; }
-        }
 
 		#endregion
 
@@ -141,11 +124,11 @@ namespace RelativeLineNumbers
 				TextBlock tb = new TextBlock();
 				tb.Text = string.Format("{0,2}", Math.Abs(cursorLineIndex - i));
 				tb.FontFamily = _fontFamily;
-                tb.FontSize = FontSize; 
+				tb.FontSize = _fontEmSize;
 				tb.Foreground = fgBrush;
 				tb.FontWeight = fontWeight;
 				Canvas.SetLeft(tb, _labelOffsetX);
-				Canvas.SetTop(tb, (_textView.TextViewLines[i].TextTop - _textView.ViewportTop) * ZoomFactor);
+				Canvas.SetTop(tb, _textView.TextViewLines[i].TextTop - _textView.ViewportTop);
 				_canvas.Children.Add(tb);
 			}
 		}
@@ -161,7 +144,7 @@ namespace RelativeLineNumbers
 			System.Globalization.CultureInfo.GetCultureInfo("en-us"),
 			System.Windows.FlowDirection.LeftToRight,
 			fontTypeFace,
-			FontSize,
+			fontSize,
 			Brushes.Black);
 
 			return formattedText.MinWidth;
