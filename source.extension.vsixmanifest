@@ -3,7 +3,7 @@
 	<Identifier Id="RelativeLineNumbers.Zoltan.Klinger.ecf8ccdf-17d2-4c5a-9131-bb6887c7b6c3">
 		<Name>RelativeLineNumbers</Name>
 		<Author>Zoltan Klinger</Author>
-		<Version>1.0.2.999</Version>
+		<Version>1.0.3</Version>
 		<Description xml:space="preserve">Displays line numbers relative to the current cursor position. Useful for ViEmu and VsVim extension users.</Description>
 		<Locale>1033</Locale>
 		<MoreInfoUrl>https://github.com/zklinger/RelativeLineNumbers</MoreInfoUrl>
