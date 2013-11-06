@@ -92,7 +92,7 @@ namespace RelativeLineNumbers
 
 		private void OnLayoutChanged(object sender, TextViewLayoutChangedEventArgs e)
 		{
-			if (e.VerticalTranslation || e.NewOrReformattedLines.Count > 1)
+			if (e.VerticalTranslation || e.NewOrReformattedLines.Count > 1 || e.TranslatedLines.Count > 0)
 			{
 				DrawLineNumbers();
 			}
