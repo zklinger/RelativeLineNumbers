@@ -40,7 +40,7 @@ namespace RelativeLineNumbers
 		private bool _isDisposed = false;
 		private Canvas _canvas;
 		private double _lastPos = -1.00;
-		private double _labelOffsetX = 6.0;
+		private double _labelOffsetX = 3.0;
 		private FontFamily _fontFamily = null;
 		private double _fontEmSize = 12.00;
 		private IEditorFormatMap _formatMap;
@@ -106,6 +106,7 @@ namespace RelativeLineNumbers
 		{
 			// Get the index from the line collection where the cursor is currently sitting
 			int cursorLineIndex = _textView.TextViewLines.GetIndexOfTextLine(_textView.Caret.ContainingTextViewLine);
+			int digitWidth = this.DigitWidth;
 
 			// Clear existing text boxes
 			if (_canvas.Children.Count > 0)
@@ -121,8 +122,16 @@ namespace RelativeLineNumbers
 
 			for (int i = 0; i < _textView.TextViewLines.Count; i++)
 			{
+				int extraDigitPadding = 1;
+				int lineNumberToDisplay = Math.Abs(cursorLineIndex - i);
+				if (0 == lineNumberToDisplay)
+				{
+				    lineNumberToDisplay = this.CurrentLineNumber;
+				    extraDigitPadding = 0;
+				}
+
 				TextBlock tb = new TextBlock();
-				tb.Text = string.Format("{0,2}", Math.Abs(cursorLineIndex - i));
+				tb.Text = this.PadNumberToWidth(lineNumberToDisplay, digitWidth + extraDigitPadding);
 				tb.FontFamily = _fontFamily;
 				tb.FontSize = _fontEmSize;
 				tb.Foreground = fgBrush;
@@ -133,6 +142,26 @@ namespace RelativeLineNumbers
 			}
 		}
 
+		private int CurrentLineNumber
+		{
+		    get { return _textView.Caret.ContainingTextViewLine.Start.GetContainingLine().LineNumber + 1; }
+		}
+
+		private int TotalLineCount
+		{
+		    get { return _textView.TextSnapshot.LineCount; }
+		}
+
+		private int DigitWidth
+		{
+		    get { return this.TotalLineCount.ToString().Length; }
+		}
+
+		private string PadNumberToWidth(int number, int width)
+		{
+		    return string.Format("{0," + width + "}", number);
+		}
+
 		#endregion
 
 		#region GetMarginWidth
@@ -140,14 +169,14 @@ namespace RelativeLineNumbers
 		private double GetMarginWidth(Typeface fontTypeFace, double fontSize)
 		{
 			FormattedText formattedText = new FormattedText(
-			"99",
+			this.PadNumberToWidth(this.TotalLineCount, this.DigitWidth + 1),
 			System.Globalization.CultureInfo.GetCultureInfo("en-us"),
 			System.Windows.FlowDirection.LeftToRight,
 			fontTypeFace,
 			fontSize,
 			Brushes.Black);
 
-			return formattedText.MinWidth;
+			return formattedText.MinWidth + (2 * _labelOffsetX);
 		}
 
 		#endregion
