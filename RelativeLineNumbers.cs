@@ -20,11 +20,14 @@
  *********************************************************************/
 
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Windows.Controls;
 using System.Windows;
 using System.Windows.Media;
-using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.Text.Classification;
+using Microsoft.VisualStudio.Text.Editor;
+using Microsoft.VisualStudio.Text.Formatting;
 
 namespace RelativeLineNumbers
 {
@@ -44,6 +47,7 @@ namespace RelativeLineNumbers
 		private FontFamily _fontFamily = null;
 		private double _fontEmSize = 12.00;
 		private IEditorFormatMap _formatMap;
+		private Dictionary<int, int> _lineMap;
 
 		#endregion
 
@@ -56,6 +60,7 @@ namespace RelativeLineNumbers
 		{
 			_textView = textView;
 			_formatMap = formatMap;
+			_lineMap = new Dictionary<int, int>();
 
 			_canvas = new Canvas();
 			this.Children.Add(_canvas);
@@ -65,7 +70,6 @@ namespace RelativeLineNumbers
 			_fontFamily = _textView.FormattedLineSource.DefaultTextProperties.Typeface.FontFamily;
 			_fontEmSize = _textView.FormattedLineSource.DefaultTextProperties.FontRenderingEmSize;
 
-			this.Width = GetMarginWidth(new Typeface(_fontFamily.Source), _fontEmSize) + 2 * _labelOffsetX;
 			_textView.Caret.PositionChanged += new EventHandler<CaretPositionChangedEventArgs>(OnCaretPositionChanged);
 			_textView.ViewportHeightChanged += (sender, args) => DrawLineNumbers();
 			_textView.LayoutChanged += new EventHandler<TextViewLayoutChangedEventArgs>(OnLayoutChanged);
@@ -92,10 +96,7 @@ namespace RelativeLineNumbers
 
 		private void OnLayoutChanged(object sender, TextViewLayoutChangedEventArgs e)
 		{
-			if (e.VerticalTranslation || e.NewOrReformattedLines.Count > 1 || e.TranslatedLines.Count > 0)
-			{
-				DrawLineNumbers();
-			}
+			DrawLineNumbers();
 		}
 
 		#endregion
@@ -104,8 +105,52 @@ namespace RelativeLineNumbers
 
 		private void DrawLineNumbers()
 		{
+			int lineCount = _textView.TextViewLines.Count;
+			int notFoundVal = Int32.MaxValue;
+
+			List<int> rlnList = new List<int>();
+
 			// Get the index from the line collection where the cursor is currently sitting
 			int cursorLineIndex = _textView.TextViewLines.GetIndexOfTextLine(_textView.Caret.ContainingTextViewLine);
+
+			if (cursorLineIndex > -1)
+			{
+				_lineMap.Clear();
+				for (int i = 0; i < lineCount; i++)
+				{
+					int relLineNr = cursorLineIndex - i;
+					rlnList.Add(relLineNr);
+					_lineMap[GetLineNumber(i)] = relLineNr;
+				}
+			}
+			else
+			{
+				// Cursor is off the screen. Extrapolate relative line numbers.
+				for (int i = 0; i < lineCount; i++)
+				{
+					int relLineNr = 0;
+
+					// Try to get relative line number value for this line from the map.
+					if (!_lineMap.TryGetValue(GetLineNumber(i), out relLineNr))
+					{
+						relLineNr = notFoundVal;
+					}
+					rlnList.Add(relLineNr);
+				}
+
+				// Extrapolate missing relative line number values
+				for (int i = 0; i < lineCount; i++)
+				{
+					if (rlnList[0] != notFoundVal)
+					{
+						rlnList[i] = rlnList[0] - i;
+					}
+					else if (rlnList[rlnList.Count - 1] != notFoundVal)
+					{
+						rlnList[lineCount - 1 - i] = rlnList[lineCount - 1] + i;
+					}
+				}
+			}
 
 			// Clear existing text boxes
 			if (_canvas.Children.Count > 0)
@@ -119,10 +164,15 @@ namespace RelativeLineNumbers
 				                         FontWeights.Bold : FontWeights.Normal;
 			this.Background = (SolidColorBrush)rd[EditorFormatDefinition.BackgroundBrushId];
 
-			for (int i = 0; i < _textView.TextViewLines.Count; i++)
+			string notFoundTxt = "~ ";
+
+			for (int i = 0; i < lineCount; i++)
 			{
+				int relLineNumber = rlnList[i];
+				_lineMap[GetLineNumber(i)] = relLineNumber;
+
 				TextBlock tb = new TextBlock();
-				tb.Text = string.Format("{0,2}", Math.Abs(cursorLineIndex - i));
+				tb.Text = string.Format("{0,2}", relLineNumber == notFoundVal ? notFoundTxt : Math.Abs(relLineNumber).ToString());
 				tb.FontFamily = _fontFamily;
 				tb.FontSize = _fontEmSize;
 				tb.Foreground = fgBrush;
@@ -131,16 +181,27 @@ namespace RelativeLineNumbers
 				Canvas.SetTop(tb, _textView.TextViewLines[i].TextTop - _textView.ViewportTop);
 				_canvas.Children.Add(tb);
 			}
+
+			// Ajdust margin width
+			int maxVal = Math.Max(Math.Abs(rlnList[0]), Math.Abs(rlnList[rlnList.Count - 1]));
+			string sample = maxVal == notFoundVal ? notFoundTxt : maxVal.ToString();
+			this.Width = GetMarginWidth(new Typeface(_fontFamily.Source), _fontEmSize, sample) + 2 * _labelOffsetX;
+		}
+
+		private int GetLineNumber(int index)
+		{
+			int position = _textView.TextViewLines[index].Start.Position;
+			return _textView.TextViewLines[index].Start.Snapshot.GetLineNumberFromPosition(position) + 1;
 		}
 
 		#endregion
 
 		#region GetMarginWidth
 
-		private double GetMarginWidth(Typeface fontTypeFace, double fontSize)
+		private double GetMarginWidth(Typeface fontTypeFace, double fontSize, string txt)
 		{
 			FormattedText formattedText = new FormattedText(
-			"99",
+			txt,
 			System.Globalization.CultureInfo.GetCultureInfo("en-us"),
 			System.Windows.FlowDirection.LeftToRight,
 			fontTypeFace,
