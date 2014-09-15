@@ -166,13 +166,23 @@ namespace RelativeLineNumbers
 
 			string notFoundTxt = "~ ";
 
+			// The amount of digits in the amount of lines is used to calculate the width of the line
+			// numbers. For documents that have less than 9999 lines, this is static, which prevents the
+			// margin's width from being adjusted while typing (adding a tenth line would otherwise
+			// cause the margin's width to change, making the document 'jump' sideways).
+			int documentLineCount = _textView.TextSnapshot.LineCount;
+			int maxDigits = CalculateNumDigits(Math.Max(documentLineCount, 1000));
+			
 			for (int i = 0; i < lineCount; i++)
 			{
 				int relLineNumber = rlnList[i];
 				_lineMap[GetLineNumber(i)] = relLineNumber;
 
 				TextBlock tb = new TextBlock();
-				tb.Text = string.Format("{0,2}", relLineNumber == notFoundVal ? notFoundTxt : Math.Abs(relLineNumber).ToString());
+				tb.Text = relLineNumber == notFoundVal ? notFoundTxt : Math.Abs(relLineNumber).ToString();
+				// Padding the text causes it to be right-aligned. Setting the TextAlignment property does
+				// not properly do this.
+				tb.Text = tb.Text.PadLeft(maxDigits);
 				tb.FontFamily = _fontFamily;
 				tb.FontSize = _fontEmSize;
 				tb.Foreground = fgBrush;
@@ -182,10 +192,17 @@ namespace RelativeLineNumbers
 				_canvas.Children.Add(tb);
 			}
 
-			// Ajdust margin width
-			int maxVal = Math.Max(Math.Abs(rlnList[0]), Math.Abs(rlnList[rlnList.Count - 1]));
-			string sample = maxVal == notFoundVal ? notFoundTxt : maxVal.ToString();
+			string sample = new string('-', maxDigits);
 			this.Width = GetMarginWidth(new Typeface(_fontFamily.Source), _fontEmSize, sample) + 2 * _labelOffsetX;
+		}
+
+		private static int CalculateNumDigits(int num)
+		{
+			if (num == 0)
+			{
+				return 1;
+			}
+			return (int)Math.Floor(Math.Log10(Math.Abs(num))) + 1;
 		}
 
 		private int GetLineNumber(int index)
