@@ -44,8 +44,6 @@ namespace RelativeLineNumbers
 		private Canvas _canvas;
 		private double _lastPos = -1.00;
 		private double _labelOffsetX = 6.0;
-		private FontFamily _fontFamily = null;
-		private double _fontEmSize = 12.00;
 		private IEditorFormatMap _formatMap;
 		private Dictionary<int, int> _lineMap;
 
@@ -66,9 +64,6 @@ namespace RelativeLineNumbers
 			this.Children.Add(_canvas);
 
 			this.ClipToBounds = true;
-
-			_fontFamily = _textView.FormattedLineSource.DefaultTextProperties.Typeface.FontFamily;
-			_fontEmSize = _textView.FormattedLineSource.DefaultTextProperties.FontRenderingEmSize;
 
 			_textView.Caret.PositionChanged += new EventHandler<CaretPositionChangedEventArgs>(OnCaretPositionChanged);
 			_textView.ViewportHeightChanged += (sender, args) => DrawLineNumbers();
@@ -107,6 +102,8 @@ namespace RelativeLineNumbers
 		{
 			int lineCount = _textView.TextViewLines.Count;
 			int notFoundVal = Int32.MaxValue;
+            FontFamily fontFamily = _textView.FormattedLineSource.DefaultTextProperties.Typeface.FontFamily;
+            double fontEmSize = _textView.FormattedLineSource.DefaultTextProperties.FontRenderingEmSize;
 
 			List<int> rlnList = new List<int>();
 
@@ -173,8 +170,8 @@ namespace RelativeLineNumbers
 
 				TextBlock tb = new TextBlock();
 				tb.Text = string.Format("{0,2}", relLineNumber == notFoundVal ? notFoundTxt : Math.Abs(relLineNumber).ToString());
-				tb.FontFamily = _fontFamily;
-				tb.FontSize = _fontEmSize;
+				tb.FontFamily = fontFamily;
+				tb.FontSize = fontEmSize;
 				tb.Foreground = fgBrush;
 				tb.FontWeight = fontWeight;
 				Canvas.SetLeft(tb, _labelOffsetX);
@@ -185,7 +182,7 @@ namespace RelativeLineNumbers
 			// Ajdust margin width
 			int maxVal = Math.Max(Math.Abs(rlnList[0]), Math.Abs(rlnList[rlnList.Count - 1]));
 			string sample = maxVal == notFoundVal ? notFoundTxt : maxVal.ToString();
-			this.Width = GetMarginWidth(new Typeface(_fontFamily.Source), _fontEmSize, sample) + 2 * _labelOffsetX;
+			this.Width = GetMarginWidth(new Typeface(fontFamily.Source), fontEmSize, sample) + 2 * _labelOffsetX;
 		}
 
 		private int GetLineNumber(int index)
