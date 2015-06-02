@@ -27,7 +27,7 @@ using Microsoft.VisualStudio.Text.Editor;
 
 namespace RelativeLineNumbers
 {
-	#region Format definition
+	#region Format definitions
 	[Export(typeof(EditorFormatDefinition))]
 	[ContentType("text")]
 	[TextViewRole(PredefinedTextViewRoles.Document)]
@@ -46,6 +46,23 @@ namespace RelativeLineNumbers
 		}
 	}
 
+	[Export(typeof(EditorFormatDefinition))]
+	[ContentType("text")]
+	[TextViewRole(PredefinedTextViewRoles.Document)]
+	[ClassificationType(ClassificationTypeNames = "Relative Line Numbers")]
+	[Name("Relative Line Numbers - Current Line")]
+	[UserVisible(true)]
+	[Order(Before = Priority.Default)]
+	internal sealed class RelativeLineNumberCurrentLineLook : ClassificationFormatDefinition
+	{
+		public RelativeLineNumberCurrentLineLook()
+		{
+			this.DisplayName = "Relative Line Numbers - Current Line";
+			this.ForegroundColor = Colors.Yellow;
+			this.BackgroundColor = Colors.Black;
+			this.IsBold = true;
+		}
+	}
 	#endregion //Format definition
 }
 

@@ -109,6 +109,14 @@ namespace RelativeLineNumbers
 
 			// Get the index from the line collection where the cursor is currently sitting
 			int cursorLineIndex = _textView.TextViewLines.GetIndexOfTextLine(_textView.Caret.ContainingTextViewLine);
+			int lastCursorPos = _textView.Caret.Position.BufferPosition.Position;
+
+			int absoluteLineNumber = -1;
+
+			if (lastCursorPos >= 0)
+			{
+				absoluteLineNumber = _textView.TextBuffer.CurrentSnapshot.GetLineNumberFromPosition(lastCursorPos);
+			}
 
 			if (cursorLineIndex > -1)
 			{
@@ -166,14 +174,35 @@ namespace RelativeLineNumbers
 			for (int i = 0; i < lineCount; i++)
 			{
 				int relLineNumber = rlnList[i];
+
+				var isCurrentLine = relLineNumber == 0 && cursorLineIndex > -1;
+
+				if (isCurrentLine && absoluteLineNumber >= 0)
+					relLineNumber = absoluteLineNumber + 1;
+
 				_lineMap[GetLineNumber(i)] = relLineNumber;
 
 				TextBlock tb = new TextBlock();
-				tb.Text = string.Format("{0,2}", relLineNumber == notFoundVal ? notFoundTxt : Math.Abs(relLineNumber).ToString());
 				tb.FontFamily = fontFamily;
 				tb.FontSize = fontEmSize;
-				tb.Foreground = fgBrush;
-				tb.FontWeight = fontWeight;
+
+				if (isCurrentLine)
+				{
+					tb.Text = string.Format("{0}", relLineNumber == notFoundVal ? notFoundTxt : Math.Abs(relLineNumber).ToString());
+					
+					ResourceDictionary rdCur = _formatMap.GetProperties("Relative Line Numbers - Current Line");
+					tb.Foreground = (SolidColorBrush)rdCur[EditorFormatDefinition.ForegroundBrushId];
+					tb.FontWeight = Convert.ToBoolean(rdCur[ClassificationFormatDefinition.IsBoldId]) ?
+												 FontWeights.Bold : FontWeights.Normal;
+					tb.Background = (SolidColorBrush)rdCur[EditorFormatDefinition.BackgroundBrushId];
+				}
+				else
+				{
+					tb.Text = string.Format("{0," + Math.Max(2, absoluteLineNumber.ToString().Length) + "}", relLineNumber == notFoundVal ? notFoundTxt : Math.Abs(relLineNumber).ToString());
+					tb.Foreground = fgBrush;
+					tb.FontWeight = fontWeight;
+				}
+
 				Canvas.SetLeft(tb, _labelOffsetX);
 				Canvas.SetTop(tb, _textView.TextViewLines[i].TextTop - _textView.ViewportTop);
 				_canvas.Children.Add(tb);
