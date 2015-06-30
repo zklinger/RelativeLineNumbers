@@ -23,29 +23,36 @@ using System.ComponentModel.Composition;
 using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.Utilities;
 using Microsoft.VisualStudio.Text.Classification;
+using Microsoft.VisualStudio.Shell;
+using EnvDTE;
+using EnvDTE80;
 
 namespace RelativeLineNumbers
 {
-	#region RelativeLineNumbers Factory
-	/// <summary>
-	/// Export a <see cref="IWpfTextViewMarginProvider"/>, which returns an instance of the margin for the editor
-	/// to use.
-	/// </summary>
-	[Export(typeof(IWpfTextViewMarginProvider))]
-	[Name(RelativeLineNumbers.MarginName)]
-	[Order(After = PredefinedMarginNames.LeftSelection)]
-	[MarginContainer(PredefinedMarginNames.LeftSelection)]
-	[ContentType("code")]
-	[TextViewRole(PredefinedTextViewRoles.Document)]
-	internal sealed class MarginFactory : IWpfTextViewMarginProvider
-	{
-		[Import]
-		internal IEditorFormatMapService FormatMapService = null;
+    #region RelativeLineNumbers Factory
+    /// <summary>
+    /// Export a <see cref="IWpfTextViewMarginProvider"/>, which returns an instance of the margin for the editor
+    /// to use.
+    /// </summary>
+    [Export(typeof(IWpfTextViewMarginProvider))]
+    [Name(RelativeLineNumbers.MarginName)]
+    [Order(After = PredefinedMarginNames.LeftSelection)]
+    [MarginContainer(PredefinedMarginNames.LeftSelection)]
+    [ContentType("code")]
+    [TextViewRole(PredefinedTextViewRoles.Document)]
+    internal sealed class MarginFactory : IWpfTextViewMarginProvider
+    {
+        [Import]
+        internal IEditorFormatMapService FormatMapService = null;
 
-		public IWpfTextViewMargin CreateMargin(IWpfTextViewHost textViewHost, IWpfTextViewMargin containerMargin)
-		{
-			return new RelativeLineNumbers(textViewHost.TextView, FormatMapService.GetEditorFormatMap(textViewHost.TextView));
-		}
-	}
-	#endregion
+        [Import]
+        internal SVsServiceProvider ServiceProvider = null;
+
+        public IWpfTextViewMargin CreateMargin(IWpfTextViewHost textViewHost, IWpfTextViewMargin containerMargin)
+        {
+            DTE dte = (DTE)ServiceProvider.GetService(typeof(DTE));
+            return new RelativeLineNumbers(textViewHost.TextView, FormatMapService.GetEditorFormatMap(textViewHost.TextView), dte);
+        }
+    }
+    #endregion
 }

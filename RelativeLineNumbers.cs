@@ -28,241 +28,282 @@ using System.Windows.Media;
 using Microsoft.VisualStudio.Text.Classification;
 using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.Text.Formatting;
+using EnvDTE;
+using EnvDTE80;
 
 namespace RelativeLineNumbers
 {
-	/// <summary>
-	/// A class detailing the margin's visual definition including both size and content.
-	/// </summary>
-	class RelativeLineNumbers : Canvas, IWpfTextViewMargin //, IClassifier
-	{
-		#region Member Variables
+    /// <summary>
+    /// A class detailing the margin's visual definition including both size and content.
+    /// </summary>
+    class RelativeLineNumbers : Canvas, IWpfTextViewMargin
+    {
+        #region Member Variables
 
-		public const string MarginName = "RelativeLineNumbers";
-		private IWpfTextView _textView;
-		private bool _isDisposed = false;
-		private Canvas _canvas;
-		private double _lastPos = -1.00;
-		private double _labelOffsetX = 6.0;
-		private IEditorFormatMap _formatMap;
-		private Dictionary<int, int> _lineMap;
+        public const string MarginName = "RelativeLineNumbers";
+        private IWpfTextView _textView;
+        private bool _isDisposed = false;
+        private Canvas _canvas;
+        private double _lastPos = -1.00;
+        private double _labelOffsetX = 6.0;
+        private IEditorFormatMap _formatMap;
+        private Dictionary<int, int> _lineMap;
+        private bool _mixedMode = false;
+        private DTE _dte;
 
-		#endregion
+        #endregion
 
-		#region Constructor
-		/// <summary>
-		/// Creates a <see cref="RelativeLineNumbers"/> for a given <see cref="IWpfTextView"/>.
-		/// </summary>
-		/// <param name="textView">The <see cref="IWpfTextView"/> to attach the margin to.</param>
-		public RelativeLineNumbers(IWpfTextView textView, IEditorFormatMap formatMap)
-		{
-			_textView = textView;
-			_formatMap = formatMap;
-			_lineMap = new Dictionary<int, int>();
+        #region Constructor
+        /// <summary>
+        /// Creates a <see cref="RelativeLineNumbers"/> for a given <see cref="IWpfTextView"/>.
+        /// </summary>
+        /// <param name="textView">The <see cref="IWpfTextView"/> to attach the margin to.</param>
+        public RelativeLineNumbers(IWpfTextView textView, IEditorFormatMap formatMap, DTE dte)
+        {
+            _textView = textView;
+            _formatMap = formatMap;
+            _dte = dte;
+            _lineMap = new Dictionary<int, int>();
 
-			_canvas = new Canvas();
-			this.Children.Add(_canvas);
+            _canvas = new Canvas();
+            this.Children.Add(_canvas);
 
-			this.ClipToBounds = true;
+            this.ClipToBounds = true;
 
-			_textView.Caret.PositionChanged += new EventHandler<CaretPositionChangedEventArgs>(OnCaretPositionChanged);
-			_textView.ViewportHeightChanged += (sender, args) => DrawLineNumbers();
-			_textView.LayoutChanged += new EventHandler<TextViewLayoutChangedEventArgs>(OnLayoutChanged);
-			_formatMap.FormatMappingChanged += (sender, args) => DrawLineNumbers();
+            _textView.Caret.PositionChanged += new EventHandler<CaretPositionChangedEventArgs>(OnCaretPositionChanged);
+            _textView.ViewportHeightChanged += (sender, args) => DrawLineNumbers();
+            _textView.LayoutChanged += new EventHandler<TextViewLayoutChangedEventArgs>(OnLayoutChanged);
+            _formatMap.FormatMappingChanged += (sender, args) => DrawLineNumbers();
+            EnvDTE.Properties props = _dte.get_Properties("Relative Line Numbers", "Cursor Line Number");
+            _mixedMode = (bool)props.Item("OptionBool").Value;
 
-			this.ToolTip = "To customize Relative Line Numbers select:\n" +
-			               "  Tools -> Options -> Fonts and Colors -> Relative Line Numbers";
-		}
 
-		#endregion
+            this.ToolTip = "To customize Relative Line Numbers select:\n\n" +
+                           "  Tools -> Options -> Fonts and Colors -> Relative Line Numbers\n" +
+                           "  Tools -> Options -> Fonts and Colors -> Relative Line Numbers Cursor Line\n" +
+                           "  Tools -> Options -> Relative Line Numbers -> Cursor Line Number\n";
 
-		#region Event Handlers
+        }
 
-		private void OnCaretPositionChanged (object sender, CaretPositionChangedEventArgs e)
-		{
-			double pos = e.TextView.Caret.ContainingTextViewLine.TextTop;
+        #endregion
 
-			if (_lastPos != pos)
-			{
-				_lastPos = pos;
-				DrawLineNumbers();
-			}
-		}
+        #region Event Handlers
 
-		private void OnLayoutChanged(object sender, TextViewLayoutChangedEventArgs e)
-		{
-			DrawLineNumbers();
-		}
+        private void OnCaretPositionChanged(object sender, CaretPositionChangedEventArgs e)
+        {
+            double pos = e.TextView.Caret.ContainingTextViewLine.TextTop;
 
-		#endregion
+            if (_lastPos != pos)
+            {
+                _lastPos = pos;
+                DrawLineNumbers();
+            }
+        }
 
-		#region DrawLineNumbers
+        private void OnLayoutChanged(object sender, TextViewLayoutChangedEventArgs e)
+        {
+            DrawLineNumbers();
+        }
 
-		private void DrawLineNumbers()
-		{
-			int lineCount = _textView.TextViewLines.Count;
-			int notFoundVal = Int32.MaxValue;
+        #endregion
+
+        #region DrawLineNumbers
+
+        private void DrawLineNumbers()
+        {
+            int lineCount = _textView.TextViewLines.Count;
+            int notFoundVal = Int32.MaxValue;
+            List<int> rlnList = new List<int>();
+
+            // Get the index from the line collection where the cursor is currently sitting
+            int cursorLineIndex = _textView.TextViewLines.GetIndexOfTextLine(_textView.Caret.ContainingTextViewLine);
+
+            if (cursorLineIndex > -1)
+            {
+                _lineMap.Clear();
+                for (int i = 0; i < lineCount; i++)
+                {
+                    int relLineNr = cursorLineIndex - i;
+                    rlnList.Add(relLineNr);
+                    _lineMap[GetLineNumber(i)] = relLineNr;
+                }
+            }
+            else
+            {
+                // Cursor is off the screen. Extrapolate relative line numbers.
+                for (int i = 0; i < lineCount; i++)
+                {
+                    int relLineNr = 0;
+
+                    // Try to get relative line number value for this line from the map.
+                    if (!_lineMap.TryGetValue(GetLineNumber(i), out relLineNr))
+                    {
+                        relLineNr = notFoundVal;
+                    }
+                    rlnList.Add(relLineNr);
+                }
+
+                // Extrapolate missing relative line number values
+                for (int i = 0; i < lineCount; i++)
+                {
+                    if (rlnList[0] != notFoundVal)
+                    {
+                        rlnList[i] = rlnList[0] - i;
+                    }
+                    else if (rlnList[rlnList.Count - 1] != notFoundVal)
+                    {
+                        rlnList[lineCount - 1 - i] = rlnList[lineCount - 1] + i;
+                    }
+                }
+            }
+
+            // Look and feel
             FontFamily fontFamily = _textView.FormattedLineSource.DefaultTextProperties.Typeface.FontFamily;
             double fontEmSize = _textView.FormattedLineSource.DefaultTextProperties.FontRenderingEmSize;
+            ResourceDictionary rdm = _formatMap.GetProperties("Relative Line Numbers Cursor Line");
+            SolidColorBrush fgBrushCursorLine = (SolidColorBrush)rdm[EditorFormatDefinition.ForegroundBrushId];
+            SolidColorBrush bgBrushCursorLine = (SolidColorBrush)rdm[EditorFormatDefinition.BackgroundBrushId];
+            ResourceDictionary rd = _formatMap.GetProperties("Relative Line Numbers");
+            SolidColorBrush fgBrush = (SolidColorBrush)rd[EditorFormatDefinition.ForegroundBrushId];
+            FontWeight fontWeight = Convert.ToBoolean(rd[ClassificationFormatDefinition.IsBoldId]) ?
+                                         FontWeights.Bold : FontWeights.Normal;
 
-			List<int> rlnList = new List<int>();
+            string lineFormatTemplate;
+            string cursorLineFormatTemplate;
+            string sample;
+            int totalLineCount = _textView.FormattedLineSource.SourceTextSnapshot.LineCount;
+            int totalLineCountStrLength = totalLineCount.ToString().Length;
 
-			// Get the index from the line collection where the cursor is currently sitting
-			int cursorLineIndex = _textView.TextViewLines.GetIndexOfTextLine(_textView.Caret.ContainingTextViewLine);
+            if (_mixedMode)
+            {
+                lineFormatTemplate = string.Format("{{0, {0}}}", totalLineCountStrLength + 2);
+                cursorLineFormatTemplate = string.Format("{{0, -{0}}}", totalLineCountStrLength + 2);
+                sample = (100 * totalLineCount).ToString();
+            }
+            else
+            {
+                cursorLineFormatTemplate = lineFormatTemplate = string.Format("{{0, {0}}}", totalLineCountStrLength);
+                sample = totalLineCount.ToString();
+            }
 
-			if (cursorLineIndex > -1)
-			{
-				_lineMap.Clear();
-				for (int i = 0; i < lineCount; i++)
-				{
-					int relLineNr = cursorLineIndex - i;
-					rlnList.Add(relLineNr);
-					_lineMap[GetLineNumber(i)] = relLineNr;
-				}
-			}
-			else
-			{
-				// Cursor is off the screen. Extrapolate relative line numbers.
-				for (int i = 0; i < lineCount; i++)
-				{
-					int relLineNr = 0;
+            // Set margin background color and width
+            this.Background = (SolidColorBrush)rd[EditorFormatDefinition.BackgroundBrushId];
+            this.Width = GetMarginWidth(new Typeface(fontFamily.Source), fontEmSize, sample) + 2 * _labelOffsetX;
 
-					// Try to get relative line number value for this line from the map.
-					if (!_lineMap.TryGetValue(GetLineNumber(i), out relLineNr))
-					{
-						relLineNr = notFoundVal;
-					}
-					rlnList.Add(relLineNr);
-				}
+            // Clear existing text boxes
+            if (_canvas.Children.Count > 0)
+            {
+                _canvas.Children.Clear();
+            }
 
-				// Extrapolate missing relative line number values
-				for (int i = 0; i < lineCount; i++)
-				{
-					if (rlnList[0] != notFoundVal)
-					{
-						rlnList[i] = rlnList[0] - i;
-					}
-					else if (rlnList[rlnList.Count - 1] != notFoundVal)
-					{
-						rlnList[lineCount - 1 - i] = rlnList[lineCount - 1] + i;
-					}
-				}
-			}
+            // Draw relative line numbers
+            for (int i = 0; i < lineCount; i++)
+            {
+                int relLineNumber = rlnList[i];
+                _lineMap[GetLineNumber(i)] = relLineNumber;
 
-			// Clear existing text boxes
-			if (_canvas.Children.Count > 0)
-			{
-				_canvas.Children.Clear();
-			}
+                TextBlock tb = new TextBlock();
+                tb.Text = string.Format(lineFormatTemplate, relLineNumber == notFoundVal ? "~" : Math.Abs(relLineNumber).ToString());
+                if (relLineNumber == 0)
+                {
+                    tb.Foreground = fgBrushCursorLine;
+                    tb.Background = bgBrushCursorLine;
+                    if (_mixedMode)
+                    {
+                        tb.Text = string.Format(cursorLineFormatTemplate, GetLineNumber(i));
+                    }
+                }
+                else
+                {
+                    tb.Foreground = fgBrush;
+                }
+                tb.FontFamily = fontFamily;
+                tb.FontSize = fontEmSize;
+                tb.FontWeight = fontWeight;
+                Canvas.SetLeft(tb, _labelOffsetX);
+                Canvas.SetTop(tb, _textView.TextViewLines[i].TextTop - _textView.ViewportTop);
+                _canvas.Children.Add(tb);
+            }
+        }
 
-			ResourceDictionary rd = _formatMap.GetProperties("Relative Line Numbers");
-			SolidColorBrush fgBrush = (SolidColorBrush)rd[EditorFormatDefinition.ForegroundBrushId];
-			FontWeight fontWeight = Convert.ToBoolean(rd[ClassificationFormatDefinition.IsBoldId]) ?
-				                         FontWeights.Bold : FontWeights.Normal;
-			this.Background = (SolidColorBrush)rd[EditorFormatDefinition.BackgroundBrushId];
+        private int GetLineNumber(int index)
+        {
+            int position = _textView.TextViewLines[index].Start.Position;
+            return _textView.TextViewLines[index].Start.Snapshot.GetLineNumberFromPosition(position) + 1;
+        }
 
-			string notFoundTxt = "~ ";
+        #endregion
 
-			for (int i = 0; i < lineCount; i++)
-			{
-				int relLineNumber = rlnList[i];
-				_lineMap[GetLineNumber(i)] = relLineNumber;
+        #region GetMarginWidth
 
-				TextBlock tb = new TextBlock();
-				tb.Text = string.Format("{0,2}", relLineNumber == notFoundVal ? notFoundTxt : Math.Abs(relLineNumber).ToString());
-				tb.FontFamily = fontFamily;
-				tb.FontSize = fontEmSize;
-				tb.Foreground = fgBrush;
-				tb.FontWeight = fontWeight;
-				Canvas.SetLeft(tb, _labelOffsetX);
-				Canvas.SetTop(tb, _textView.TextViewLines[i].TextTop - _textView.ViewportTop);
-				_canvas.Children.Add(tb);
-			}
+        private double GetMarginWidth(Typeface fontTypeFace, double fontSize, string txt)
+        {
+            FormattedText formattedText = new FormattedText(
+            txt,
+            System.Globalization.CultureInfo.GetCultureInfo("en-us"),
+            System.Windows.FlowDirection.LeftToRight,
+            fontTypeFace,
+            fontSize,
+            Brushes.Black);
 
-			// Ajdust margin width
-			int maxVal = Math.Max(Math.Abs(rlnList[0]), Math.Abs(rlnList[rlnList.Count - 1]));
-			string sample = maxVal == notFoundVal ? notFoundTxt : maxVal.ToString();
-			this.Width = GetMarginWidth(new Typeface(fontFamily.Source), fontEmSize, sample) + 2 * _labelOffsetX;
-		}
+            return formattedText.MinWidth;
+        }
 
-		private int GetLineNumber(int index)
-		{
-			int position = _textView.TextViewLines[index].Start.Position;
-			return _textView.TextViewLines[index].Start.Snapshot.GetLineNumberFromPosition(position) + 1;
-		}
+        #endregion
 
-		#endregion
+        private void ThrowIfDisposed()
+        {
+            if (_isDisposed)
+                throw new ObjectDisposedException(MarginName);
+        }
 
-		#region GetMarginWidth
+        #region IWpfTextViewMargin Members
 
-		private double GetMarginWidth(Typeface fontTypeFace, double fontSize, string txt)
-		{
-			FormattedText formattedText = new FormattedText(
-			txt,
-			System.Globalization.CultureInfo.GetCultureInfo("en-us"),
-			System.Windows.FlowDirection.LeftToRight,
-			fontTypeFace,
-			fontSize,
-			Brushes.Black);
+        public System.Windows.FrameworkElement VisualElement
+        {
+            get
+            {
+                ThrowIfDisposed();
+                return this;
+            }
+        }
 
-			return formattedText.MinWidth;
-		}
+        #endregion
 
-		#endregion
+        #region ITextViewMargin Members
 
-		private void ThrowIfDisposed()
-		{
-			if (_isDisposed)
-				throw new ObjectDisposedException(MarginName);
-		}
+        public double MarginSize
+        {
+            get
+            {
+                ThrowIfDisposed();
+                return this.ActualWidth;
+            }
+        }
 
-		#region IWpfTextViewMargin Members
+        public bool Enabled
+        {
+            get
+            {
+                ThrowIfDisposed();
+                return true;
+            }
+        }
 
-		public System.Windows.FrameworkElement VisualElement
-		{
-			get
-			{
-				ThrowIfDisposed();
-				return this;
-			}
-		}
+        public ITextViewMargin GetTextViewMargin(string marginName)
+        {
+            return (marginName == RelativeLineNumbers.MarginName) ? (IWpfTextViewMargin)this : null;
+        }
 
-		#endregion
+        public void Dispose()
+        {
+            if (!_isDisposed)
+            {
+                GC.SuppressFinalize(this);
+                _isDisposed = true;
+            }
+        }
 
-		#region ITextViewMargin Members
-
-		public double MarginSize
-		{
-			get
-			{
-				ThrowIfDisposed();
-				return this.ActualWidth;
-			}
-		}
-
-		public bool Enabled
-		{
-			get
-			{
-				ThrowIfDisposed();
-				return true;
-			}
-		}
-
-		public ITextViewMargin GetTextViewMargin(string marginName)
-		{
-			return (marginName == RelativeLineNumbers.MarginName) ? (IWpfTextViewMargin)this : null;
-		}
-
-		public void Dispose()
-		{
-			if (!_isDisposed)
-			{
-				GC.SuppressFinalize(this);
-				_isDisposed = true;
-			}
-		}
-
-		#endregion
-	}
+        #endregion
+    }
 }

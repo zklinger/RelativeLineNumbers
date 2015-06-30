@@ -27,25 +27,42 @@ using Microsoft.VisualStudio.Text.Editor;
 
 namespace RelativeLineNumbers
 {
-	#region Format definition
-	[Export(typeof(EditorFormatDefinition))]
-	[ContentType("text")]
-	[TextViewRole(PredefinedTextViewRoles.Document)]
-	[ClassificationType(ClassificationTypeNames = "Relative Line Numbers")]
-	[Name("Relative Line Numbers")]
-	[UserVisible(true)]
-	[Order(Before = Priority.Default)]
-	internal sealed class RelativeLineNumberLook : ClassificationFormatDefinition
-	{
-		public RelativeLineNumberLook()
-		{
-			this.DisplayName = "Relative Line Numbers";
-			this.ForegroundColor = Colors.LimeGreen;
-			this.BackgroundColor = Colors.Black;
-			this.IsBold = true;
-		}
-	}
+    #region Format definition
+    [Export(typeof(EditorFormatDefinition))]
+    [ContentType("text")]
+    [TextViewRole(PredefinedTextViewRoles.Document)]
+    [ClassificationType(ClassificationTypeNames = "Relative Line Numbers")]
+    [Name("Relative Line Numbers")]
+    [UserVisible(true)]
+    [Order(Before = Priority.Default)]
+    internal sealed class RelativeLineNumberLook : ClassificationFormatDefinition
+    {
+        public RelativeLineNumberLook()
+        {
+            this.DisplayName = "Relative Line Numbers";
+            this.ForegroundColor = Colors.LimeGreen;
+            this.BackgroundColor = Colors.Black;
+            this.IsBold = true;
+        }
+    }
 
-	#endregion //Format definition
+    [Export(typeof(EditorFormatDefinition))]
+    [ContentType("text")]
+    [TextViewRole(PredefinedTextViewRoles.Document)]
+    [ClassificationType(ClassificationTypeNames = "Relative Line Numbers Cursor Line")]
+    [Name("Relative Line Numbers Cursor Line")]
+    [UserVisible(true)]
+    [Order(Before = Priority.Default)]
+    internal sealed class RelativeLineNumberMarkerLook : ClassificationFormatDefinition
+    {
+        public RelativeLineNumberMarkerLook()
+        {
+            this.DisplayName = "Relative Line Numbers Cursor Line";
+            this.ForegroundColor = Colors.HotPink;
+            this.BackgroundColor = Colors.Black;
+            this.IsBold = true;
+        }
+    }
+
+    #endregion //Format definition
 }
-
