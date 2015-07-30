@@ -44,10 +44,9 @@ namespace RelativeLineNumbers
         private IWpfTextView _textView;
         private bool _isDisposed = false;
         private Canvas _canvas;
-        private double _lastPos = -1.00;
+        private double _lastCaretPos = -1.00;
         private double _labelOffsetX = 6.0;
         private IEditorFormatMap _formatMap;
-        private Dictionary<int, int> _lineMap;
         private bool _mixedMode = false;
         private DTE _dte;
 
@@ -63,8 +62,6 @@ namespace RelativeLineNumbers
             _textView = textView;
             _formatMap = formatMap;
             _dte = dte;
-            _lineMap = new Dictionary<int, int>();
-
             _canvas = new Canvas();
             this.Children.Add(_canvas);
 
@@ -93,9 +90,9 @@ namespace RelativeLineNumbers
         {
             double pos = e.TextView.Caret.ContainingTextViewLine.TextTop;
 
-            if (_lastPos != pos)
+            if (_lastCaretPos != pos)
             {
-                _lastPos = pos;
+                _lastCaretPos = pos;
                 DrawLineNumbers();
             }
         }
@@ -111,53 +108,23 @@ namespace RelativeLineNumbers
 
         private void DrawLineNumbers()
         {
-            int lineCount = _textView.TextViewLines.Count;
-            int notFoundVal = Int32.MaxValue;
-            List<int> rlnList = new List<int>();
+            Dictionary<int, int> indexMap = new Dictionary<int, int>();
+            int index = -1;
 
             // Get the index from the line collection where the cursor is currently sitting
             int cursorLineIndex = _textView.TextViewLines.GetIndexOfTextLine(_textView.Caret.ContainingTextViewLine);
 
-            if (cursorLineIndex > -1)
+            // Detect wrapped lines
+            for (int i = 0; i < _textView.TextViewLines.Count; i++)
             {
-                _lineMap.Clear();
-                for (int i = 0; i < lineCount; i++)
+                if (_textView.TextViewLines[i].IsFirstTextViewLineForSnapshotLine)
                 {
-                    int relLineNr = cursorLineIndex - i;
-                    rlnList.Add(relLineNr);
-                    _lineMap[GetLineNumber(i)] = relLineNr;
+                    index++;
                 }
-            }
-            else
-            {
-                // Cursor is off the screen. Extrapolate relative line numbers.
-                for (int i = 0; i < lineCount; i++)
-                {
-                    int relLineNr = 0;
-
-                    // Try to get relative line number value for this line from the map.
-                    if (!_lineMap.TryGetValue(GetLineNumber(i), out relLineNr))
-                    {
-                        relLineNr = notFoundVal;
-                    }
-                    rlnList.Add(relLineNr);
-                }
-
-                // Extrapolate missing relative line number values
-                for (int i = 0; i < lineCount; i++)
-                {
-                    if (rlnList[0] != notFoundVal)
-                    {
-                        rlnList[i] = rlnList[0] - i;
-                    }
-                    else if (rlnList[rlnList.Count - 1] != notFoundVal)
-                    {
-                        rlnList[lineCount - 1 - i] = rlnList[lineCount - 1] + i;
-                    }
-                }
+                indexMap[i] = index;
             }
 
-            // Look and feel
+            // Set look and feel
             FontFamily fontFamily = _textView.FormattedLineSource.DefaultTextProperties.Typeface.FontFamily;
             double fontEmSize = _textView.FormattedLineSource.DefaultTextProperties.FontRenderingEmSize;
             ResourceDictionary rdm = _formatMap.GetProperties("Relative Line Numbers Cursor Line");
@@ -197,32 +164,54 @@ namespace RelativeLineNumbers
             }
 
             // Draw relative line numbers
-            for (int i = 0; i < lineCount; i++)
+            for (int i = 0; i < _textView.TextViewLines.Count; i++)
             {
-                int relLineNumber = rlnList[i];
-                _lineMap[GetLineNumber(i)] = relLineNumber;
-
                 TextBlock tb = new TextBlock();
-                tb.Text = string.Format(lineFormatTemplate, relLineNumber == notFoundVal ? "~" : Math.Abs(relLineNumber).ToString());
-                if (relLineNumber == 0)
+                tb.Foreground = fgBrush;
+
+                if (cursorLineIndex == -1)
                 {
-                    tb.Foreground = fgBrushCursorLine;
-                    tb.Background = bgBrushCursorLine;
-                    if (_mixedMode)
-                    {
-                        tb.Text = string.Format(cursorLineFormatTemplate, GetLineNumber(i));
-                    }
+                    tb.Text = "~";
                 }
                 else
                 {
-                    tb.Foreground = fgBrush;
+                    if (_textView.TextViewLines[i].IsFirstTextViewLineForSnapshotLine)
+                    {
+                        tb.Text = string.Format(lineFormatTemplate, Math.Abs(indexMap[cursorLineIndex] - indexMap[i]).ToString());
+                    }
+                    else
+                    {
+                        // Wrapped line, show nothing
+                        tb.Text = "";
+                    }
                 }
+
                 tb.FontFamily = fontFamily;
                 tb.FontSize = fontEmSize;
                 tb.FontWeight = fontWeight;
                 Canvas.SetLeft(tb, _labelOffsetX);
                 Canvas.SetTop(tb, _textView.TextViewLines[i].TextTop - _textView.ViewportTop);
                 _canvas.Children.Add(tb);
+            }
+
+            // Format line at current cursor line position
+            if (cursorLineIndex > -1)
+            {
+                int idx = indexMap[cursorLineIndex];
+                foreach (var kvp in indexMap)
+                {
+                    if (kvp.Value == idx)
+                    {
+                        TextBlock tb = _canvas.Children[kvp.Key] as TextBlock;
+                        tb.Foreground = fgBrushCursorLine;
+                        tb.Background = bgBrushCursorLine;
+                        if (_mixedMode)
+                        {
+                            tb.Text = string.Format(cursorLineFormatTemplate, GetLineNumber(kvp.Key));
+                        }
+                        break;
+                    }
+                }
             }
         }
 
